@@ -76,11 +76,27 @@ define alloc(a, l) {
 //         of dynamic arrays. You may also store other (ghost) information
 //         such as time credits needed for amortized analysis.
 //         Feel free to add acessor functions to simplify fold-unfold reasoning.
-predicate dyn_array(self: Ref)
+predicate dyn_array(self: Ref) {
+    acc(self.length) // Permission to acces and modyfy the length.
+    && acc(self.capacity) // Permission to acces and modyfy the capacity.
+    && acc(self.array) // Permission to access and modify the underlying static array field.
+    && self.capacity > 0 // Ensures a valid posetiv capacity.
+    && self.length >= 0 //  Prevents negative lengths.
+    && self.length < self.capacity // Ensures there is always 1 available slot. 
+    && len(self.array) == self.capacity // Ensurs the allocated array matches the specified capacity. 
+    && staticArray(self.array) // Provide permission to all ellements in the underlying array.
+}
 
 
 // Accessor functions for commonly needed fields
 function arr_length(base: Ref): Int 
+    requires dyn_array(base)
+{
+    unfolding dyn_array(base) in base.length // Returns the number of elements currently stored in the dynamic array
+                                            // by temporarily unfolding the dyn_array predicate to access its length.
+}
+
+
 
 // Feel free to also implement acessor or abstraction functions to simplify fold-unfold reasoning.
 // -----------------------------------------
@@ -93,9 +109,20 @@ function arr_length(base: Ref): Int
 //         given capacity that satisfies all data structure invariants of dynamic arrays.
 // Remember to require sufficiently many time credits.
 method cons(_capacity: Int) returns (arr: Ref)
-    requires 0 < _capacity
+    requires 0 < _capacity // The capacity must be posetive
+    requires acc(time_credit(), 1/1) // Requires one time credit
+    ensures dyn_array(arr) // Ensures all representation invariants are satisfied
+    ensures arr_length(arr) == 0 // Ensures the dynamic array is empty
+    ensures unfolding dyn_array(arr) in arr.capacity == _capacity // Ensures the correct capacity
 {
     consume_time_credit() // every method call must consume a time credit
+    arr := new(length, capacity, array) // Creates a new object with the three fields
+    arr.length := 0 // Initializes the length to 0
+    arr.capacity := _capacity // Initializes the capacity to the given _capacity
+    
+    alloc(arr.array, _capacity) // Allocates the underlying static array with the given _capacity
+
+    fold dyn_array(arr) // Establishes the predicate by collecting permissions and proving its invariants
 }
 // -----------------------------------------
 
