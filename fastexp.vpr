@@ -38,9 +38,46 @@ method lemma_pow(b: Int, y: Int)
 // Do not modify the given production code. However, feel free to 
 // introduce additional functions, lemma methods or ghost code.
 // Furthermore, make sure that the functional contract remains intact.
+
+//Since every iteration halves y we need some function to compute log_2 + 1
+function iters(y: Int): Int
+    requires y >= 0
+    decreases y
+    ensures result >= 0                 
+    ensures y == 0 ==> result == 0
+    ensures y > 0 ==> result == 1 + iters(y / 2)
+{
+    y == 0 ? 0 : 1 + iters(y / 2)
+}
+
+//Ghost counter that mimics production code but counts iterations whenever we would consume a time credit
+method fast_pow_count(n: Int, e: Int) returns (count: Int)
+    requires 0 < e
+    ensures count == iters(e) + 1 
+    // Ensures that the count is exactly the amount of time credits we have allocated to fast_pow.
+    // Since this code mirros the amount of steps in fast_pow we and the count mateches iters(e) + 1 exactly
+    // any smaller amount of time credits would not work.
+{
+    var b: Int := n
+    var y: Int := e
+    var res: Int := 1
+    var i: Int := 0
+    while (y > 0)
+        invariant 0 <= y
+        invariant i + iters(y) == iters(e)
+    {
+        if (y % 2 == 1) { res := res * b }
+        y := y / 2
+        b := b * b
+        i := i + 1
+    }
+    count := 1 + i
+}
+
 method fast_pow(n: Int, e: Int)
     returns (res: Int)
     requires 0 < e
+    requires acc(time_credit(), (iters(e) + 1)/1) //time credit bound
     // TODO: verify; add time credits and runtime bounds
     ensures res == math_pow(n, e)
 {
@@ -51,11 +88,17 @@ method fast_pow(n: Int, e: Int)
     res := 1
 
     while (y > 0)
+    invariant 0 <= y
+    invariant res * math_pow(b, y) == math_pow(n, e)
+    invariant acc(time_credit(), iters(y)/1) //Need one less time credit since we already consumed one
     {
         consume_time_credit() // we must spend a credit for every loop iteration
 
         if (y % 2 == 1) {
+            lemma_pow(b, y - 1) //we need to preserve this in the body so our invariants hold
             res := res * b
+        } else {
+            lemma_pow(b, y) //w e need to preserve this in the body so our invariants hold
         }
 
         y := y / 2
