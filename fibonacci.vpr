@@ -29,9 +29,51 @@ method consume_time_credit() //
 // Do not modify the given production code. However, feel free to 
 // introduce additional functions, lemma methods or ghost code.
 // Furthermore, make sure that the functional contract remains intact.
+
+
+//Mathematical fibonachi definition to check against
+function fib(n: Int): Int
+    requires n >= 0
+    decreases n
+    ensures result >= 0
+    ensures n == 0 ==> result == 0
+    ensures n == 1 ==> result == 1
+    ensures n >= 2 ==> result == fib(n-1) + fib(n-2)
+    ensures n >= 1 ==> result >= 1
+{
+    n <= 1 ? n : fib(n-1) + fib(n-2)
+}
+
+//Ghost counter that mimics production code but counts calls
+method fib_count(n: Int) returns (res: Int, calls: Int)
+    requires n >= 0
+    ensures res == fib(n)
+    ensures calls == (2 * fib(n+1) - 1) //Ensures that the calls are exactly the requred amount of time_credits we have allocated
+{
+    if (n == 0) {
+        res := 0
+        calls := 1
+    } elseif (n == 1) {
+        res := 1
+        calls := 1
+    } else {
+        var r1: Int
+        var c1: Int
+        r1, c1 := fib_count(n - 1)
+
+        var r2: Int
+        var c2: Int
+        r2, c2 := fib_count(n - 2)
+
+        res := r1 + r2
+        calls := 1 + c1 + c2
+    }
+}
+
 method fib_recursive(n: Int) returns (res: Int)
     requires n >= 0
-    // TODO add time credits and functional specification
+    requires acc(time_credit(), (2 * fib(n+1) - 1)/1) //required time credits
+    ensures res == fib(n) // Fuctional correctness
 {
     consume_time_credit() // we must spend a credit for every call
 
